@@ -1,0 +1,72 @@
+/* frontend/src/App.css */
+.App {
+  text-align: center;
+}
+
+.App-header {
+  background-color: #282c34; /* Un tono oscuro de gris/azul para el fondo */
+  min-height: 100vh; /* Ocupa al menos toda la altura de la ventana */
+  display: flex;
+  flex-direction: column; /* Elementos apilados verticalmente */
+  align-items: center; /* Centra horizontalmente */
+  justify-content: center; /* Centra verticalmente */
+  font-size: calc(10px + 2vmin); /* Tamaño de fuente adaptable */
+  color: white; /* Color de texto blanco */
+}
+
+button {
+  padding: 10px 20px;
+  font-size: 1.2em;
+  margin: 10px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  background-color: #61dafb; /* Un azul claro vibrante */
+  color: #282c34; /* Texto oscuro para contraste */
+  transition: background-color 0.3s ease;
+}
+
+button:hover {
+  background-color: #4dc2ea; /* Un azul un poco más oscuro al pasar el ratón */
+}
+
+/* Estilos para el área de transcripción */
+.transcript-container {
+  margin-top: 20px;
+  background-color: #3a3f47; /* Fondo ligeramente más claro que el header */
+  padding: 20px;
+  border-radius: 8px;
+  width: 80%;
+  max-width: 600px;
+  min-height: 100px;
+  text-align: left;
+  overflow-y: auto; /* Para scroll si el texto es muy largo */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  color: white; /* Asegurarse de que el texto dentro sea blanco */
+}
+
+.transcript-container p {
+  margin-bottom: 5px;
+  line-height: 1.5;
+}
+
+/* Estilos para resultados de productos */
+.product-results {
+    margin-top: 20px;
+    background-color: #3a3f47;
+    padding: 20px;
+    border-radius: 8px;
+    width: 80%;
+    max-width: 600px;
+    text-align: left;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    color: white; /* Asegurarse de que el texto dentro sea blanco */
+}
+.product-results h2 {
+    color: #61dafb;
+    margin-bottom: 15px;
+}
+.product-results p {
+    font-size: 1.1em;
+    margin-bottom: 10px;
+}
