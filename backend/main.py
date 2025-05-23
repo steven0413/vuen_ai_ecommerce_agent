@@ -1,4 +1,3 @@
-# backend/main.py
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -12,11 +11,10 @@ load_dotenv()
 app = FastAPI()
 
 # Configura CORS (Cross-Origin Resource Sharing)
-# Esto es crucial para que tu frontend (que estará en un origen diferente) pueda comunicarse con tu backend.
-# En producción, deberías restringir 'allow_origins' a la URL específica de tu frontend.
+# Crucial para que el frontend (que estará en un origen diferente) pueda comunicarse con tu backend.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Permite cualquier origen (para desarrollo)
+    allow_origins=["*"],  
     allow_credentials=True,
     allow_methods=["*"],  # Permite todos los métodos (GET, POST, etc.)
     allow_headers=["*"],  # Permite todos los encabezados
@@ -26,13 +24,10 @@ app.add_middleware(
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 if not OPENAI_API_KEY:
-    # Es crucial que la clave API esté configurada.
     # Esta excepción detendrá la aplicación si no se encuentra la clave.
     raise ValueError("La variable de entorno OPENAI_API_KEY no está configurada. Por favor, revisa tu archivo .env")
 
 # Inicializa el cliente de OpenAI
-# La base_url por defecto de la librería OpenAI es 'https://api.openai.com/v1',
-# lo cual es correcto para la mayoría de los endpoints, incluyendo el de realtime.sessions.
 openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
 
@@ -57,14 +52,14 @@ async def create_realtime_session():
         ephemeral_key = session_object.token
 
         if not ephemeral_key:
-            # Aunque poco probable, si el token no se encuentra, lanzamos un error.
+            # Si el token no se encuentra, lanzamos un error.
             raise HTTPException(status_code=500, detail="La respuesta de OpenAI no contenía un token de sesión válido.")
 
         # Retorna la clave efímera al frontend.
         return {"ephemeral_key": ephemeral_key}
 
     except openai.APIError as e:
-        # Manejo de errores específicos de la API de OpenAI (ej. clave API inválida, límites excedidos).
+        # Manejo de errores específicos de la API de OpenAI.
         # Accedemos al mensaje de error de la API si está disponible, o usamos la representación del error.
         error_message = e.response.json().get("error", {}).get("message", str(e)) if hasattr(e, 'response') and hasattr(e.response, 'json') else str(e)
         status_code = e.status_code if hasattr(e, 'status_code') else 500
