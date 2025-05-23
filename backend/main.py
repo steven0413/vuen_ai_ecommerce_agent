@@ -1,65 +1,39 @@
-import os
-import openai
+# backend/main.py
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+import os
+import openai
 
-# --- AÑADIMOS ESTO PARA DEPURACIÓN EXTREMA ---
-print("--- DEBUG: main.py cargado correctamente ---")
-
-# Esto mostrará la ruta de la librería openai que se está cargando
-if hasattr(openai, '__file__'):
-    print(f"DEBUG: Ruta de openai cargado: {openai.__file__}")
-else:
-    print("DEBUG: No se pudo determinar la ruta de openai.")
-
-# Forzar una importación para asegurarnos de que el módulo no es un placeholder
-try:
-    from openai import OpenAI as ActualOpenAIClient
-    print("DEBUG: Importación explícita de OpenAI exitosa.")
-except Exception as e:
-    print(f"DEBUG: Fallo la importación explícita de OpenAI: {e}")
-    ActualOpenAIClient = None # Asegurarse de que no haya un error si falla
-
-# --- FIN DEPURACIÓN EXTREMA ---
-
+# Carga las variables de entorno desde .env
 load_dotenv()
 
+# Inicializa la aplicación FastAPI
 app = FastAPI()
 
+# Configura CORS (Cross-Origin Resource Sharing)
+# Esto es crucial para que tu frontend (que estará en un origen diferente) pueda comunicarse con tu backend.
+# En producción, deberías restringir 'allow_origins' a la URL específica de tu frontend.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Permite cualquier origen (para desarrollo)
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # Permite todos los métodos (GET, POST, etc.)
+    allow_headers=["*"],  # Permite todos los encabezados
 )
 
+# Obtiene la clave API de OpenAI desde las variables de entorno
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 if not OPENAI_API_KEY:
-    raise ValueError("La variable de entorno OPENAI_API_KEY no está configurada.")
+    # Es crucial que la clave API esté configurada.
+    # Esta excepción detendrá la aplicación si no se encuentra la clave.
+    raise ValueError("La variable de entorno OPENAI_API_KEY no está configurada. Por favor, revisa tu archivo .env")
 
-# Cambiamos aquí para usar ActualOpenAIClient si la importación fue exitosa
-if ActualOpenAIClient:
-    openai_client = ActualOpenAIClient(api_key=OPENAI_API_KEY)
-else:
-    # Si la importación explícita falla, revertimos al método original, pero el error ya debería haber sido reportado
-    print("DEBUG: Usando openai.OpenAI normal porque la importación explícita falló.")
-    openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
-
-
-# --- INICIO DEL CÓDIGO DE DEPURACIÓN DE ATRIBUTOS ---
-print(f"DEBUG: Tipo de openai_client: {type(openai_client)}")
-if hasattr(openai_client, 'realtime'):
-    print("DEBUG: openai_client SÍ TIENE el atributo 'realtime'.")
-    if hasattr(openai_client.realtime, 'sessions'):
-        print("DEBUG: openai_client.realtime SÍ TIENE el atributo 'sessions'.")
-    else:
-        print("DEBUG: openai_client.realtime NO TIENE el atributo 'sessions'.")
-else:
-    print("DEBUG: openai_client NO TIENE el atributo 'realtime'.")
-# --- FIN DEL CÓDIGO DE DEPURACIÓN DE ATRIBUTOS ---
+# Inicializa el cliente de OpenAI
+# La base_url por defecto de la librería OpenAI es 'https://api.openai.com/v1',
+# lo cual es correcto para la mayoría de los endpoints, incluyendo el de realtime.sessions.
+openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
 
 @app.get("/")
@@ -68,19 +42,33 @@ async def root():
 
 @app.post("/session")
 async def create_realtime_session():
+    """
+    Endpoint para generar una clave efímera (token de sesión) para la API de Realtime de OpenAI.
+    """
     try:
+        # Llama a la API de OpenAI para crear una sesión en tiempo real.
+        # La librería OpenAI gestiona el endpoint correcto (/v1/realtime/sessions).
+        # La respuesta es un objeto de sesión que contiene el token necesario para WebRTC.
         session_object = await openai_client.realtime.sessions.create()
-        ephemeral_key = session_object.token
-        if not ephemeral_key:
-            raise HTTPException(status_code=500, detail="No se pudo obtener la clave efímera.")
 
+        # Accedemos al token de la sesión.
+        # Según la documentación de OpenAI para la API de tiempo real,
+        # el token para establecer la conexión WebRTC se encuentra en el atributo 'token'.
+        ephemeral_key = session_object.token
+
+        if not ephemeral_key:
+            # Aunque poco probable, si el token no se encuentra, lanzamos un error.
+            raise HTTPException(status_code=500, detail="La respuesta de OpenAI no contenía un token de sesión válido.")
+
+        # Retorna la clave efímera al frontend.
         return {"ephemeral_key": ephemeral_key}
 
-    except openai.APIError as e: # Esta es la clase base para la mayoría de los errores en la versión 1.x
-        print(f"Error de la API de OpenAI: {e}")
+    except openai.APIError as e:
+        # Manejo de errores específicos de la API de OpenAI (ej. clave API inválida, límites excedidos).
+        # Accedemos al mensaje de error de la API si está disponible, o usamos la representación del error.
+        error_message = e.response.json().get("error", {}).get("message", str(e)) if hasattr(e, 'response') and hasattr(e.response, 'json') else str(e)
         status_code = e.status_code if hasattr(e, 'status_code') else 500
-        detail_message = f"Error de la API de OpenAI: {e.response.text if hasattr(e, 'response') and hasattr(e.response, 'text') else str(e)}"
-        raise HTTPException(status_code=status_code, detail=detail_message)
+        raise HTTPException(status_code=status_code, detail=f"Error de la API de OpenAI: {error_message}")
     except Exception as e:
-        print(f"Error inesperado al crear la sesión en tiempo real: {e}")
-        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {e}")
+        # Manejo de cualquier otro error inesperado.
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
