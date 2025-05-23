@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import './App.css'; 
 
 function App() {
@@ -19,11 +19,6 @@ function App() {
     }
     message += ". (Datos simulados)";
     setFilteredProductsMessage(message);
-  };
-
-  // Función para simular una transcripción en vivo (puedes adaptarla o eliminarla si no la usas)
-  const simulateLiveTranscript = (text) => {
-    setLiveTranscription(prev => prev + " " + text);
   };
 
   const handleStartRecording = async () => {

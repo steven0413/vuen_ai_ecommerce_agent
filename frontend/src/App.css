@@ -4,7 +4,7 @@
 }
 
 .App-header {
-  background-color: #282c34; /* Un tono oscuro de gris/azul para el fondo */
+  background-color: #282c34; /* Tono oscuro de gris/azul para el fondo */
   min-height: 100vh; /* Ocupa al menos toda la altura de la ventana */
   display: flex;
   flex-direction: column; /* Elementos apilados verticalmente */
