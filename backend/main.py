@@ -1,69 +1,99 @@
+# backend/main.py
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
+from openai import AsyncOpenAI
+from pydantic import BaseModel
 import os
-import openai
+from dotenv import load_dotenv
 
-# Carga las variables de entorno desde .env
+# Cargar variables de entorno desde .env
 load_dotenv()
 
-# Inicializa la aplicación FastAPI
 app = FastAPI()
 
-# Configura CORS (Cross-Origin Resource Sharing)
-# Crucial para que el frontend (que estará en un origen diferente) pueda comunicarse con tu backend.
+# Configuración de CORS para permitir solicitudes desde tu frontend React
+# Asegúrate de que esta URL coincida con la de tu frontend
+origins = [
+    "http://localhost",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],  # Permite todos los métodos (GET, POST, etc.)
-    allow_headers=["*"],  # Permite todos los encabezados
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-# Obtiene la clave API de OpenAI desde las variables de entorno
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+# Obtener la API Key de OpenAI
+openai_api_key = os.getenv("OPENAI_API_KEY")
+if not openai_api_key:
+    # Si la clave no está configurada, eleva un error claro
+    print("ADVERTENCIA: La variable de entorno OPENAI_API_KEY no está configurada.")
+    raise ValueError("La variable de entorno OPENAI_API_KEY no está configurada. Por favor, configúrala en un archivo .env en la carpeta 'backend'.")
 
-if not OPENAI_API_KEY:
-    # Esta excepción detendrá la aplicación si no se encuentra la clave.
-    raise ValueError("La variable de entorno OPENAI_API_KEY no está configurada. Por favor, revisa tu archivo .env")
+# Inicializar el cliente asíncrono de OpenAI
+openai_client = AsyncOpenAI(api_key=openai_api_key)
 
-# Inicializa el cliente de OpenAI
-openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
+# 🧠 CORRECCIÓN CLAVE: Definición de la herramienta (función) filter_products para OpenAI
+# La estructura debe ser PRECISA para que OpenAI la reconozca.
+ECOMMERCE_TOOLS = [
+    {
+        "name": "filter_products",
+        "description": "Filters products in an online store based on user criteria.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "category": {"type": "string", "description": "e.g., shoes, shirts, etc."},
+                "color": {"type": "string", "description": "e.g., red, blue, etc."},
+                "max_price": {"type": "number", "description": "Maximum price in USD"},
+            },
+            "required": ["category"]
+        },
+        "type": "function"
+    }
+]
 
+# Modelo Pydantic para la respuesta de la sesión (solo contiene la clave efímera)
+class SessionCreateResponse(BaseModel):
+    ephemeral_key: str
+
+@app.post("/session", response_model=SessionCreateResponse)
+async def create_session():
+    """
+    Crea una nueva sesión para la API Realtime Voice de OpenAI, incluyendo las herramientas,
+    y devuelve la clave efímera (client_secret).
+    """
+    print("Intentando crear una nueva sesión...")
+    try:
+        # Aquí puedes loguear que la API Key se cargó, pero evitamos imprimir el valor completo
+        # por seguridad en entornos de producción. Para depuración es útil.
+        print(f"API Key cargada correctamente (longitud: {len(openai_api_key)}).")
+
+        session = await openai_client.beta.realtime.sessions.create(
+            # MODELO: Asegúrate de que este modelo esté disponible para tu cuenta de OpenAI.
+            # Según las directrices, debe ser "gpt-4o-realtime-preview-2024-12-17".
+            model="gpt-4o-realtime-preview-2024-12-17",
+            instructions="You are an E-commerce agent. Your main task is to help users find products by filtering them based on their voice commands. Use the 'filter_products' tool when the user asks to find specific products. If you cannot fulfill the request with the available tools, respond naturally and explain what you can do.",
+            voice="alloy", # Voz de la IA (puedes elegir otras si están disponibles)
+            modalities=["audio", "text"], # Modos de interacción (audio para voz, texto para transcripciones/chat)
+            tools=ECOMMERCE_TOOLS # ¡Aquí se usa la definición corregida de las herramientas!
+        )
+
+        # Accedemos a la clave efímera a través de session.client_secret.value
+        ephemeral_key_value = session.client_secret.value
+        print(f"Clave efímera generada: {ephemeral_key_value[:10]}... (recortada por seguridad)") # Loguear una parte
+
+        return {"ephemeral_key": ephemeral_key_value}
+
+    except Exception as e:
+        print(f"Error al crear la sesión en el backend: {e}")
+        # Detalle de error más amigable sin exponer la API key directamente
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor al crear la sesión de OpenAI. Por favor, verifica tu API Key y que el modelo 'gpt-4o-realtime-preview-2024-12-17' esté disponible para tu cuenta. Detalle específico del error: {e}")
 
 @app.get("/")
-async def root():
-    return {"message": "Bienvenido al Backend del Agente de E-commerce de VUEN AI"}
-
-@app.post("/session")
-async def create_realtime_session():
-    """
-    Endpoint para generar una clave efímera (token de sesión) para la API de Realtime de OpenAI.
-    """
-    try:
-        # Llama a la API de OpenAI para crear una sesión en tiempo real.
-        # La librería OpenAI gestiona el endpoint correcto (/v1/realtime/sessions).
-        # La respuesta es un objeto de sesión que contiene el token necesario para WebRTC.
-        session_object = await openai_client.realtime.sessions.create()
-
-        # Accedemos al token de la sesión.
-        # Según la documentación de OpenAI para la API de tiempo real,
-        # el token para establecer la conexión WebRTC se encuentra en el atributo 'token'.
-        ephemeral_key = session_object.token
-
-        if not ephemeral_key:
-            # Si el token no se encuentra, lanzamos un error.
-            raise HTTPException(status_code=500, detail="La respuesta de OpenAI no contenía un token de sesión válido.")
-
-        # Retorna la clave efímera al frontend.
-        return {"ephemeral_key": ephemeral_key}
-
-    except openai.APIError as e:
-        # Manejo de errores específicos de la API de OpenAI.
-        # Accedemos al mensaje de error de la API si está disponible, o usamos la representación del error.
-        error_message = e.response.json().get("error", {}).get("message", str(e)) if hasattr(e, 'response') and hasattr(e.response, 'json') else str(e)
-        status_code = e.status_code if hasattr(e, 'status_code') else 500
-        raise HTTPException(status_code=status_code, detail=f"Error de la API de OpenAI: {error_message}")
-    except Exception as e:
-        # Manejo de cualquier otro error inesperado.
-        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
+async def read_root():
+    return {"message": "Bienvenido al Backend de VUEN AI E-commerce Agent. ¡El agente está listo!"}
