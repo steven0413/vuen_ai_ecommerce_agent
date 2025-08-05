@@ -1,5 +1,4 @@
 # backend/main.py
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from openai import AsyncOpenAI
@@ -9,11 +8,9 @@ from dotenv import load_dotenv
 
 # Cargar variables de entorno desde .env
 load_dotenv()
-
 app = FastAPI()
 
 # Configuración de CORS para permitir solicitudes desde tu frontend React
-# Asegúrate de que esta URL coincida con la de tu frontend
 origins = [
     "http://localhost",
     "http://localhost:3000",
@@ -28,7 +25,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Obtener la API Key de OpenAI
+# API Key de OpenAI
 openai_api_key = os.getenv("OPENAI_API_KEY")
 if not openai_api_key:
     # Si la clave no está configurada, eleva un error claro
@@ -38,8 +35,6 @@ if not openai_api_key:
 # Inicializar el cliente asíncrono de OpenAI
 openai_client = AsyncOpenAI(api_key=openai_api_key)
 
-# 🧠 CORRECCIÓN CLAVE: Definición de la herramienta (función) filter_products para OpenAI
-# La estructura debe ser PRECISA para que OpenAI la reconozca.
 ECOMMERCE_TOOLS = [
     {
         "name": "filter_products",
@@ -57,7 +52,6 @@ ECOMMERCE_TOOLS = [
     }
 ]
 
-# Modelo Pydantic para la respuesta de la sesión (solo contiene la clave efímera)
 class SessionCreateResponse(BaseModel):
     ephemeral_key: str
 
@@ -69,29 +63,27 @@ async def create_session():
     """
     print("Intentando crear una nueva sesión...")
     try:
-        # Aquí puedes loguear que la API Key se cargó, pero evitamos imprimir el valor completo
-        # por seguridad en entornos de producción. Para depuración es útil.
+        
         print(f"API Key cargada correctamente (longitud: {len(openai_api_key)}).")
 
         session = await openai_client.beta.realtime.sessions.create(
-            # MODELO: Asegúrate de que este modelo esté disponible para tu cuenta de OpenAI.
-            # Según las directrices, debe ser "gpt-4o-realtime-preview-2024-12-17".
+            # MODELO: Según las directrices "gpt-4o-realtime-preview-2024-12-17".
             model="gpt-4o-realtime-preview-2024-12-17",
             instructions="You are an E-commerce agent. Your main task is to help users find products by filtering them based on their voice commands. Use the 'filter_products' tool when the user asks to find specific products. If you cannot fulfill the request with the available tools, respond naturally and explain what you can do.",
-            voice="alloy", # Voz de la IA (puedes elegir otras si están disponibles)
+            voice="alloy", # Voz de la IA 
             modalities=["audio", "text"], # Modos de interacción (audio para voz, texto para transcripciones/chat)
-            tools=ECOMMERCE_TOOLS # ¡Aquí se usa la definición corregida de las herramientas!
+            tools=ECOMMERCE_TOOLS 
         )
 
-        # Accedemos a la clave efímera a través de session.client_secret.value
+        # Clave efímera a través de session.client_secret.value
         ephemeral_key_value = session.client_secret.value
-        print(f"Clave efímera generada: {ephemeral_key_value[:10]}... (recortada por seguridad)") # Loguear una parte
+        print(f"Clave efímera generada: {ephemeral_key_value[:10]}... (recortada por seguridad)") 
 
         return {"ephemeral_key": ephemeral_key_value}
 
     except Exception as e:
         print(f"Error al crear la sesión en el backend: {e}")
-        # Detalle de error más amigable sin exponer la API key directamente
+        # Detalla el error sin exponer la API key directamente
         raise HTTPException(status_code=500, detail=f"Error interno del servidor al crear la sesión de OpenAI. Por favor, verifica tu API Key y que el modelo 'gpt-4o-realtime-preview-2024-12-17' esté disponible para tu cuenta. Detalle específico del error: {e}")
 
 @app.get("/")
