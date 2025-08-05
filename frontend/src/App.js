@@ -1,7 +1,6 @@
 // frontend/src/App.js
-
 import React, { useState, useRef, useEffect } from 'react';
-import './App.css'; // Asegúrate de que este archivo CSS exista o elimínalo si no lo usas
+import './App.css'; 
 
 function App() {
   const [isListening, setIsListening] = useState(false);
@@ -62,7 +61,6 @@ function App() {
       // Añadir logs para los estados de la conexión WebRTC
       rtc.onicecandidate = (event) => {
           if (event.candidate) {
-              // console.log("ICE Candidate:", event.candidate); // Descomentar para logs detallados de ICE
           } else {
               console.log("ICE Candidates Gathered (empty candidate).");
           }
@@ -72,27 +70,24 @@ function App() {
           // Opcional: Manejar estados de conexión específicos
           if (rtc.iceConnectionState === 'disconnected' || rtc.iceConnectionState === 'failed' || rtc.iceConnectionState === 'closed') {
               console.warn("RTC ICE connection state indicates a problem or closure. State:", rtc.iceConnectionState);
-              // Considera llamar a stopListening() aquí, pero ten cuidado con bucles infinitos si la causa es el propio stopListening.
-              // En este caso, ya tenemos un try/catch en startListening que maneja errores.
+              // Try/catch en startListening que maneja errores.
           }
       };
       rtc.onconnectionstatechange = () => {
           console.log("RTC connectionState changed:", rtc.connectionState);
           if (rtc.connectionState === 'disconnected' || rtc.connectionState === 'failed' || rtc.connectionState === 'closed') {
               console.warn("RTC connection state indicates a problem or closure. State:", rtc.connectionState);
-              // Podrías detener la escucha aquí si la conexión final falla por completo.
-              // stopListening(); // ¡Precaución! Descomentar con cuidado para evitar bucles.
+              // Detener la escucha aquí si la conexión final falla por completo.
           }
       };
       rtc.onsignalingstatechange = () => {
           console.log("RTC signalingState changed:", rtc.signalingState);
       };
 
-
       console.log("3. Obtener acceso al micrófono.");
       // 3. Obtener acceso al micrófono del usuario
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach((track) => rtc.addTrack(track, stream)); // Añadir pista de audio a la conexión
+      stream.getTracks().forEach((track) => rtc.addTrack(track, stream)); 
       console.log("4. Micrófono accedido y pista de audio añadida a WebRTC.");
 
       console.log("5. Creando SDP Offer.");
@@ -125,7 +120,6 @@ function App() {
       console.log("9. Intentando establecer SDP Answer como descripción remota. Current signaling state:", rtc.signalingState);
 
       // 7. Establecer la respuesta SDP de OpenAI como descripción remota
-      // Esta es la línea donde el error 'signalingState is closed' suele ocurrir
       await rtc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: answerSdp }));
       console.log("10. SDP Answer establecida como descripción remota. Conexión WebRTC establecida.");
 
@@ -137,14 +131,14 @@ function App() {
         channel.onmessage = (messageEvent) => {
           try {
             const message = JSON.parse(messageEvent.data);
-            // console.log("Mensaje de Data Channel:", message); // Descomentar para ver todos los mensajes del canal de datos
+            // console.log("Mensaje de Data Channel:", message);
 
             if (message.type === 'transcript') {
               // Actualizar la transcripción en tiempo real
               setLiveTranscription((prev) => {
                 const lines = prev.split('\n');
                 if (message.is_final) {
-                  return prev + message.text + '\n'; // Si es final, añadir nueva línea
+                  return prev + message.text + '\n'; 
                 }
                 // Si no es final, actualizar la última línea o la única línea
                 if (lines.length === 0 || message.text.startsWith(lines[lines.length - 1])) {
@@ -178,7 +172,7 @@ function App() {
             type: 'session.update',
             session: {
               input_audio_transcription: { model: 'whisper-1' }, // Usar Whisper para la transcripción del audio del usuario
-              // output_audio_speaker: { voice: 'alloy' }, // Descomentar si necesitas forzar la voz aquí
+              // output_audio_speaker: { voice: 'alloy' }
             },
           }));
         };
